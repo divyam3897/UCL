@@ -40,13 +40,13 @@ class SI(ContinualModel):
             labels = labels.to(self.device)
             outputs = self.net.module.backbone(inputs1.to(self.device))
             penalty = self.c * self.penalty()
-            loss = self.loss(outputs, labels).mean() - penalty
+            loss = self.loss(outputs, labels).mean() + penalty
             data_dict = {'loss': loss, 'penalty': -penalty}
         else:
             data_dict = self.net.forward(inputs1.to(self.device, non_blocking=True), inputs2.to(self.device, non_blocking=True))
             data_dict['penalty'] = self.c * self.penalty() 
             data_dict['loss'] = data_dict['loss'].mean()
-            loss = data_dict['loss'] - data_dict['penalty']
+            loss = data_dict['loss'] + data_dict['penalty']
             
         loss.backward()
         nn.utils.clip_grad.clip_grad_value_(self.net.parameters(), 1)

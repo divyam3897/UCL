@@ -66,7 +66,7 @@ If you found the provided code useful, please cite our work.
 
 ```bibtex
 @inproceedings{
-  madaan2022rethinking,
+  madaan2022representational,
   title={Representational Continuity for Unsupervised Continual Learning},
   author={Divyam Madaan and Jaehong Yoon and Yuanchun Li and Yunxin Liu and Sung Ju Hwang},
   booktitle={International Conference on Learning Representations},
