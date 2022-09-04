@@ -46,13 +46,13 @@ $ python main.py --data_dir ../Data/ --log_dir ../logs/ -c configs/barlow_c10.ya
 * __Split CIFAR-100__ experiment with BarlowTwins
 
 ```
-$ python main.py --data_dir ../Data/ --log_dir ../logs/ -c configs/barlowm_c100.yaml --ckpt_dir ./checkpoints/cifar100_results/ --hide_progress
+$ python main.py --data_dir ../Data/ --log_dir ../logs/ -c configs/barlow_c100.yaml --ckpt_dir ./checkpoints/cifar100_results/ --hide_progress
 ```
 
 * __Split Tiny-ImageNet__ experiment with BarlowTwins
 
 ```
-$ python main.py --data_dir ../Data/ --log_dir ../logs/ -c configs/barlowm_tinyimagenet.yaml --ckpt_dir ./checkpoints/tinyimagenet_results/ --hide_progress
+$ python main.py --data_dir ../Data/ --log_dir ../logs/ -c configs/barlow_tinyimagenet.yaml --ckpt_dir ./checkpoints/tinyimagenet_results/ --hide_progress
 ```
 
 ## Contributing
