@@ -29,7 +29,7 @@ class SI(ContinualModel):
         if self.big_omega is None:
             self.big_omega = torch.zeros_like(self.net.module.backbone.get_params()).to(self.device)
 
-        self.big_omega = self.small_omega / ((self.net.module.backbone.get_params().data - self.checkpoint) ** 2 + self.xi)
+        self.big_omega += self.small_omega / ((self.net.module.backbone.get_params().data - self.checkpoint) ** 2 + self.xi)
 
         self.checkpoint = self.net.module.backbone.get_params().data.clone().to(self.device)
         self.small_omega = 0
@@ -41,7 +41,7 @@ class SI(ContinualModel):
             outputs = self.net.module.backbone(inputs1.to(self.device))
             penalty = self.c * self.penalty()
             loss = self.loss(outputs, labels).mean() + penalty
-            data_dict = {'loss': loss, 'penalty': -penalty}
+            data_dict = {'loss': loss, 'penalty': penalty}
         else:
             data_dict = self.net.forward(inputs1.to(self.device, non_blocking=True), inputs2.to(self.device, non_blocking=True))
             data_dict['penalty'] = self.c * self.penalty() 

@@ -1,6 +1,6 @@
-name: simsiam-c100-experiment-resnet18
+name: simsiam-c10-experiment-resnet18
 dataset: 
-  name: seq-cifar100
+  name: seq-cifar10
   image_size: 32
   num_workers: 4
 
@@ -24,10 +24,11 @@ train:
   stop_at_epoch: 200 # has to be smaller than num_epochs
   batch_size: 256
   knn_monitor: True # knn monitor will take more time
-  knn_interval: 1
+  knn_interval: 100
   knn_k: 200
   alpha: 0.4
 eval: # linear evaluation, False will turn off automatic evaluation after training
+  type: "accum"
   optimizer: 
     name: sgd
     weight_decay: 0

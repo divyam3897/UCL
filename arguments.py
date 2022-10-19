@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import random
 
-import re 
+import re
 import yaml
 
 import shutil
@@ -23,22 +23,22 @@ class Namespace(object):
                 self.__dict__[key] = Namespace(value)
             else:
                 self.__dict__[key] = value
-    
+
     def __getattr__(self, attribute):
 
         raise AttributeError(f"Can not find {attribute} in namespace. Please write {attribute} in your config file(xxx.yaml)!")
 
 
 def set_deterministic(seed):
-    # seed by default is None 
+    # seed by default is None
     if seed is not None:
         print(f"Deterministic with seed = {seed}")
-        random.seed(seed) 
-        np.random.seed(seed) 
+        random.seed(seed)
+        np.random.seed(seed)
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
-        torch.backends.cudnn.deterministic = True 
-        torch.backends.cudnn.benchmark = False 
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -58,27 +58,38 @@ def get_args():
                         help='Test on the validation set')
     parser.add_argument('--ood_eval', action='store_true',
                         help='Test on the OOD set')
-    args = parser.parse_args()
+    parser.add_argument('--run', type=int, default=0, help='run')
+    parser.add_argument('--pnn_base_widths', type=int, default=64, help='run')
 
+    args = parser.parse_args()
 
     with open(args.config_file, 'r') as f:
         for key, value in Namespace(yaml.load(f, Loader=yaml.FullLoader)).__dict__.items():
             vars(args)[key] = value
 
     if args.debug:
-        if args.train: 
+        if args.train:
             args.train.batch_size = 2
             args.train.num_epochs = 1
             args.train.stop_at_epoch = 1
-        if args.eval: 
+        if args.eval:
             args.eval.batch_size = 2
             args.eval.num_epochs = 1 # train only one epoch
         args.dataset.num_workers = 0
 
+    assert not None in [args.log_dir, args.data_dir, args.ckpt_dir, args.name]
+    args.cl_type = 'scl' if args.cl_default else 'ucl'
+    if args.pnn_base_widths != 64:
+        pnn = '_pnn%d'%args.pnn_base_widths
+    else:
+        pnn = ''
+
+    args.name = args.cl_type + '_' + args.name + '_' + args.model.cl_model + '_run_' + str(args.run)
+
 
     assert not None in [args.log_dir, args.data_dir, args.ckpt_dir, args.name]
 
-    args.log_dir = os.path.join(args.log_dir, 'in-progress_'+datetime.now().strftime('%m%d%H%M%S_')+args.name)
+    args.log_dir = os.path.join(args.log_dir, 'in-progress_' + datetime.now().strftime('%m%d%H%M%S_') + args.name)
 
     os.makedirs(args.log_dir, exist_ok=False)
     print(f'creating file {args.log_dir}')
@@ -90,7 +101,8 @@ def get_args():
 
     vars(args)['aug_kwargs'] = {
         'name':args.model.name,
-        'image_size': args.dataset.image_size
+        'image_size': args.dataset.image_size,
+        'cl_default': args.cl_default
     }
     vars(args)['dataset_kwargs'] = {
         # 'name':args.model.name,

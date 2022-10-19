@@ -56,48 +56,71 @@ def evaluate(model: ContinualModel, dataset: ContinualDataset, device, classifie
 
 
 def main(device, args):
-
     dataset = get_dataset(args)
     dataset_copy = get_dataset(args)
     train_loader, memory_loader, test_loader = dataset_copy.get_data_loaders(args)
+    results = {'knn-cls-acc':[],
+                'knn-cls-each-acc':[],
+                'knn-cls-max-acc':[],
+                'knn-cls-fgt':[],}
 
     # define model
     model = get_model(args, device, len(train_loader), dataset.get_transform(args))
 
     logger = Logger(matplotlib=args.logger.matplotlib, log_dir=args.log_dir)
     accuracy = 0 
+    
+    train_loaders, memory_loaders, test_loaders = [], [], []
+    for t in range(dataset.N_TASKS):
+      tr, me, te = dataset.get_data_loaders(args)
+      train_loaders.append(tr)
+      memory_loaders.append(me)
+      test_loaders.append(te)
 
     for t in range(dataset.N_TASKS):
-      train_loader, memory_loader, test_loader = dataset.get_data_loaders(args)
+      # train_loader, memory_loader, test_loader = dataset.get_data_loaders(args)
+      if args.eval.type == 'all':
+          eval_tids = [j for j in range(dataset.N_TASKS)]
+      elif args.eval.type == 'curr':
+          eval_tids = [t]
+      elif args.eval.type == 'accum':
+          eval_tids = [j for j in range(t + 1)]
+      else:
+          sys.exit('Stopped!! Wrong eval-type.')
+
       global_progress = tqdm(range(0, args.train.stop_at_epoch), desc=f'Training')
       for epoch in global_progress:
         model.train()
-        results, results_mask_classes = [], []
         
-        local_progress=tqdm(train_loader, desc=f'Epoch {epoch}/{args.train.num_epochs}', disable=args.hide_progress)
+        local_progress=tqdm(train_loaders[t], desc=f'Epoch {epoch}/{args.train.num_epochs}', disable=args.hide_progress)
         for idx, ((images1, images2, notaug_images), labels) in enumerate(local_progress):
             data_dict = model.observe(images1, labels, images2, notaug_images)
             logger.update_scalers(data_dict)
 
         global_progress.set_postfix(data_dict)
 
-        if args.train.knn_monitor and epoch % args.train.knn_interval == 0: 
-            for i in range(len(dataset.test_loaders)):
-              acc, acc_mask = knn_monitor(model.net.module.backbone, dataset, dataset.memory_loaders[i], dataset.test_loaders[i], device, args.cl_default, task_id=t, k=min(args.train.knn_k, len(memory_loader.dataset))) 
-              results.append(acc)
-            mean_acc = np.mean(results)
-          
-        epoch_dict = {"epoch":epoch, "accuracy": mean_acc}
-        global_progress.set_postfix(epoch_dict)
-        logger.update_scalers(epoch_dict)
-     
-      if args.cl_default:
-        accs = evaluate(model.net.module.backbone, dataset, device)
-        results.append(accs[0])
-        results_mask_classes.append(accs[1])
-        mean_acc = np.mean(accs, axis=1)
-        print_mean_accuracy(mean_acc, t + 1, dataset.SETTING)
- 
+        # if args.train.knn_monitor and epoch % args.train.knn_interval == 0: 
+        if (epoch + 1) == args.train.stop_at_epoch:
+            # depend on args.eval.type
+            if args.train.knn_monitor:
+                knn_acc_list = []
+                for i in eval_tids:
+                    acc, acc_mask = knn_monitor(model.net.module.backbone, dataset, dataset.memory_loaders[i], dataset.test_loaders[i],
+                                                device, args.cl_default, task_id=i, k=min(args.train.knn_k, len(eval_tids)))
+                    knn_acc_list.append(acc)
+
+                kfgt = []
+                # memorize current task acc
+                results['knn-cls-each-acc'].append(knn_acc_list[-1])
+                results['knn-cls-max-acc'].append(knn_acc_list[-1])
+                # memorize max accuracy
+                for j in range(t):
+                    if knn_acc_list[j] > results['knn-cls-max-acc'][j]:
+                        results['knn-cls-max-acc'][j] = knn_acc_list[j]
+                    kfgt.append(results['knn-cls-each-acc'][j] - knn_acc_list[j])
+                results['knn-cls-acc'].append(np.mean(knn_acc_list))
+                results['knn-cls-fgt'].append(np.mean(kfgt))
+
       model_path = os.path.join(args.ckpt_dir, f"{args.model.cl_model}_{args.name}_{t}.pth")
       torch.save({
         'epoch': epoch+1,
@@ -106,7 +129,8 @@ def main(device, args):
       print(f"Task Model saved to {model_path}")
       with open(os.path.join(args.log_dir, f"checkpoint_path.txt"), 'w+') as f:
         f.write(f'{model_path}')
-      
+      with open(os.path.join(f'{args.log_dir}', f"%s_accuracy_logs.txt"%args.name), 'w+') as f:
+        f.write(str(results))
       if hasattr(model, 'end_task'):
         model.end_task(dataset)
 
