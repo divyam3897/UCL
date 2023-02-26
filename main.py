@@ -17,6 +17,7 @@ from utils.loggers import CsvLogger
 from datasets.utils.continual_dataset import ContinualDataset
 from models.utils.continual_model import ContinualModel
 from typing import Tuple
+from itertools import zip_longest
 
 
 def evaluate(model: ContinualModel, dataset: ContinualDataset, device, classifier=None) -> Tuple[list, list]:
@@ -79,7 +80,8 @@ def main(device, args):
 
     for t in range(dataset.N_TASKS):
       # train_loader, memory_loader, test_loader = dataset.get_data_loaders(args)
-      if args.eval.type == 'all':
+      # NOTE: set eval_type to 'all' to evaluate on all tasks and get the average forgetting
+      if args.eval.type == 'all': 
           eval_tids = [j for j in range(dataset.N_TASKS)]
       elif args.eval.type == 'curr':
           eval_tids = [t]
@@ -111,15 +113,14 @@ def main(device, args):
 
                 kfgt = []
                 # memorize current task acc
-                results['knn-cls-each-acc'].append(knn_acc_list[-1])
-                results['knn-cls-max-acc'].append(knn_acc_list[-1])
+                results['knn-cls-each-acc'].append(knn_acc_list)
                 # memorize max accuracy
+                results['knn-cls-max-acc'] = [max(item) for item in zip_longest(*results['knn-cls-each-acc'], fillvalue=0)][:t]
                 for j in range(t):
-                    if knn_acc_list[j] > results['knn-cls-max-acc'][j]:
-                        results['knn-cls-max-acc'][j] = knn_acc_list[j]
-                    kfgt.append(results['knn-cls-each-acc'][j] - knn_acc_list[j])
+                    kfgt.append(results['knn-cls-max-acc'][j] - knn_acc_list[j])
                 results['knn-cls-acc'].append(np.mean(knn_acc_list))
-                results['knn-cls-fgt'].append(np.mean(kfgt))
+                if len(kfgt) > 0:
+                    results['knn-cls-fgt'].append(np.mean(kfgt))
 
       model_path = os.path.join(args.ckpt_dir, f"{args.model.cl_model}_{args.name}_{t}.pth")
       torch.save({

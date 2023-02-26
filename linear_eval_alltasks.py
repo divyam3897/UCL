@@ -11,7 +11,7 @@ from tools import AverageMeter, knn_monitor
 from datasets import get_dataset
 from models.optimizers import get_optimizer, LR_Scheduler
 from utils.loggers import *
-
+from itertools import zip_longest
 
 def evaluate_single(model, dataset, test_loader, memory_loader, device, k, last=False) -> Tuple[list, list, list, list]:
     accs, accs_mask_classes = [], []
@@ -41,6 +41,7 @@ def main(device, args):
       test_loaders.append(te)
 
     for t in tqdm(range(0, dataset_copy.N_TASKS), desc='Evaluatinng'):
+      # NOTE: set eval_type to 'all' to evaluate on all tasks and get the average forgetting
       if args.eval.type == 'all':
           eval_tids = [j for j in range(dataset.N_TASKS)]
       elif args.eval.type == 'curr':
@@ -62,15 +63,14 @@ def main(device, args):
           knn_acc_list.append(acc)
 
       kfgt = []
-      results['knn-cls-each-acc'].append(knn_acc_list[-1])
-      results['knn-cls-max-acc'].append(knn_acc_list[-1])
+      results['knn-cls-each-acc'].append(knn_acc_list)
       # memorize max accuracy
+      results['knn-cls-max-acc'] = [max(item) for item in zip_longest(*results['knn-cls-each-acc'], fillvalue=0)][:t]
       for j in range(t):
-          if knn_acc_list[j] > results['knn-cls-max-acc'][j]:
-              results['knn-cls-max-acc'][j] = knn_acc_list[j]
-          kfgt.append(results['knn-cls-each-acc'][j] - knn_acc_list[j])
+        kfgt.append(results['knn-cls-max-acc'][j] - knn_acc_list[j])
       results['knn-cls-acc'].append(np.mean(knn_acc_list))
-      results['knn-cls-fgt'].append(np.mean(kfgt))
+      if len(kfgt) > 0:
+        results['knn-cls-fgt'].append(np.mean(kfgt))
 
     print(results)
     with open(os.path.join(f'{args.log_dir}', f"%s_accuracy_logs.txt"%args.name), 'w+') as f:
