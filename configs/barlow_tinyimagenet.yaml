@@ -1,4 +1,4 @@
-name: simsiam-tinyimg-experiment-resnet18
+name: barlow-tinyimg-experiment-resnet18
 dataset: 
   name: seq-tinyimg
   image_size: 64
@@ -28,7 +28,7 @@ train:
   knn_k: 200
   alpha: 0.4
 eval: # linear evaluation, False will turn off automatic evaluation after training
-  type: "accum"
+  type: "all"
   optimizer: 
     name: sgd
     weight_decay: 0
